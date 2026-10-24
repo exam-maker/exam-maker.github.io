@@ -1,0 +1,155 @@
+/* 기본 설정 */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #000000;
+}
+
+body {
+  margin: 0;
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  background: #f4f6f8;
+  color: #222;
+  line-height: 1.6;
+}
+
+/* 상단 헤더 */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #000000;
+  color: #fff;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 20px;
+  color: #fff;
+}
+
+.beta-badge {
+  background: #f5a623;
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 탭 바 */
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 16px 0;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+}
+
+.tab-btn {
+  padding: 10px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-size: 15px;
+  cursor: pointer;
+  color: #555;
+}
+
+.tab-btn:hover {
+  color: #000000;
+}
+
+.tab-btn.active {
+  color: #000000;
+  font-weight: bold;
+  border-bottom-color: #000000;
+}
+
+/* 본문과 탭 패널 */
+.app-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  min-height: 70vh;
+}
+
+.tab-panel {
+  display: none;
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.tab-panel h2 {
+  margin-top: 0;
+  color: #000000;
+}
+
+.placeholder {
+  color: #888;
+  font-style: italic;
+}
+
+/* 하단 바닥글 */
+.app-footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 13px;
+  color: #777;
+}
+
+/* 좁은 화면 대응 */
+@media (max-width: 720px) {
+  .tab-btn {
+    flex: 1 1 45%;
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+
+  .tab-panel {
+    padding: 16px;
+  }
+}
+/* 메뉴 한 줄 배치 */
+.tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 4px;
+}
+.tabs > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 로고 설정 UI */
+.logo-ctrl { display: flex; flex-direction: column; gap: 12px; }
+.logo-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.logo-label { min-width: 48px; font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid #aaa; border-radius: 6px; overflow: hidden; }
+.seg button {
+  padding: 6px 12px; border: none; background: #fff; cursor: pointer;
+}
+.seg button + button { border-left: 1px solid #aaa; }
+.seg button.active { background: #000; color: #fff; }
+.pct-btn {
+  width: 36px; height: 32px; border: 1px solid #aaa; border-radius: 6px;
+  background: #fff; cursor: pointer; font-size: 18px;
+}
+.pct-value { min-width: 64px; text-align: center; font-weight: 600; }
+.logo-preview {
+  border: 1px dashed #999; border-radius: 6px; padding: 16px;
+  min-height: 90px; display: flex; align-items: center; justify-content: center;
+  background: #fff;
+}
+.logo-preview img { max-width: 100%; height: auto; }
+.logo-hint { font-size: 13px; color: #555; margin: 0; }
