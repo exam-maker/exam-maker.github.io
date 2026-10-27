@@ -1,6 +1,6 @@
 // js/prompts.js
 // 기출 분석, 변형문제 생성, 재생성, 검산용 프롬프트를 만듭니다.
-// 생성 단계에는 기출 원문(originalText)을 보내지 않도록 필드를 골라서 보냅니다.
+// 기출 원문은 분석 결과로도 받지 않으며, 생성 단계에는 설계도 필드만 보냅니다.
 
 import { TYPES, CIRCLED } from './schema.js';
 
@@ -23,6 +23,7 @@ function countWords(text) {
 
 /**
  * 기출 분석용 프롬프트입니다. 시험지 파일은 callAI의 files로 함께 보냅니다.
+ * 기출 원문(발문, 선택지, 지문)은 결과에 담지 않고, 일반화한 패턴만 받습니다.
  * @param {{school: string, grade: string, exam: string, year: number}} meta
  * @returns {{system: string, userText: string}}
  */
@@ -40,12 +41,12 @@ export function buildAnalysisPrompt(meta) {
     '- difficulty는 1~5 정수입니다. 지문 난도, 선택지 매력도, 추론 단계를 근거로 판단하세요.',
     '- source는 TEXTBOOK, MOCK, SUPPLEMENT, EXTERNAL, UNKNOWN 중 하나입니다.',
     '- choices는 객관식 선택지 개수, visual은 밑줄이나 도표 같은 시각 요소 설명입니다. 없으면 빈 문자열입니다.',
-    '- originalText에는 발문과 선택지 원문을 그대로 옮기세요. 지문 본문은 제외합니다.',
+    '- 발문, 선택지, 지문 본문의 문장을 그대로 옮기지 마세요. 문항의 구조와 유형만 설명하세요.',
     '- 배점이 보이지 않으면 score는 null입니다.',
     '- summary.trendNote에는 출제 경향을 2~3문장으로 쓰세요.',
     '',
     '출력 형식:',
-    '{ "cards": [ { "no": 1, "format": "MC", "type": "GRAMMAR", "stemPattern": "...", "point": "...", "difficulty": 3, "score": 4.0, "source": "TEXTBOOK", "choices": 5, "visual": "", "note": "", "originalText": "..." } ], "summary": { "trendNote": "..." } }',
+    '{ "cards": [ { "no": 1, "format": "MC", "type": "GRAMMAR", "stemPattern": "...", "point": "...", "difficulty": 3, "score": 4.0, "source": "TEXTBOOK", "choices": 5, "visual": "", "note": "" } ], "summary": { "trendNote": "..." } }',
     '',
     JSON_ONLY,
   ].join('\n');
@@ -61,7 +62,7 @@ export function buildAnalysisPrompt(meta) {
   return { system, userText };
 }
 
-/** 설계도 카드에서 생성에 필요한 필드만 골라냅니다. originalText는 여기서 빠집니다. */
+/** 설계도 카드에서 생성에 필요한 필드만 골라냅니다. */
 function toPlan(card) {
   return {
     no: card.no,
