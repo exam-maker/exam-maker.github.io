@@ -13,6 +13,14 @@ const JSON_ONLY =
 const KOREAN_EXAM =
   '해설은 한국어로 쓰고, 문제는 한국 내신 시험 형식(한국어 발문 + 영어 지문)으로 작성하세요.';
 
+/** 영어 지문의 단어 수를 셉니다. 공백 기준으로 나눕니다. */
+function countWords(text) {
+  return String(text || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
 /**
  * 기출 분석용 프롬프트입니다. 시험지 파일은 callAI의 files로 함께 보냅니다.
  * @param {{school: string, grade: string, exam: string, year: number}} meta
@@ -68,11 +76,16 @@ function toPlan(card) {
 
 /**
  * 한 지문에 배정된 카드들로 변형문제를 만드는 프롬프트입니다.
+ * 지문 길이를 단어 수로 지정해, 문항 번호가 뒤로 갈수록 본문이 짧아지지 않게 합니다.
  * @param {{title: string, text: string}} passage
  * @param {Array} cards - 이 지문에 배정된 설계도 카드 목록
  * @returns {{system: string, userText: string}}
  */
 export function buildGeneratePrompt({ passage, cards }) {
+  const target = countWords(passage.text);
+  const minWords = Math.max(1, Math.round(target * 0.9));
+  const maxWords = Math.round(target * 1.1);
+
   const system = [
     '당신은 한국 영어 내신 출제 교사입니다.',
     '아래 [출제 설계]에 맞춰 [지문]으로 새 문항을 만드세요.',
@@ -89,6 +102,14 @@ export function buildGeneratePrompt({ passage, cards }) {
     '- 해설에는 정답 근거를 지문에서 인용하여 설명하세요.',
     `- ${KOREAN_EXAM}`,
     '- 출제 설계의 items 배열 순서와 번호(no)를 그대로 지키세요. 항목 수를 바꾸지 마세요.',
+    '',
+    '[지문 길이 규칙 - 가장 중요]',
+    `- 참고 지문의 영어 단어 수는 약 ${target}단어입니다.`,
+    `- 모든 문항의 body(본문)는 ${minWords}~${maxWords}단어 범위여야 합니다.`,
+    '- 문항 번호가 뒤로 갈수록 지문이 짧아지면 안 됩니다. 몇 번 문항이든 같은 분량을 유지하세요.',
+    '- 어법, 빈칸, 순서, 삽입, 서술형 등 어떤 유형이든 예외는 없습니다. 충분한 길이의 본문을 먼저 쓰고 그 안에서 문항을 만드세요.',
+    '- 지문을 여러 조각으로 나누더라도 body 전체의 단어 수는 위 범위를 지켜야 합니다.',
+    '- 출력하기 전에 각 문항의 body 단어 수를 직접 세고, 범위를 벗어나면 다시 작성하세요.',
     '',
     '출력 형식:',
     '{ "items": [ { "no": 1, "type": "GRAMMAR", "format": "MC", "stem": "발문", "body": "변형 지문", "choices": ["①...", "②...", "③...", "④...", "⑤..."], "answer": "③", "explanation": "해설", "difficulty": 3, "score": 4.0 } ] }',
@@ -133,6 +154,7 @@ export function buildRegeneratePrompt({ passage, item, mode = 'same' }) {
     '- 기존 문항을 그대로 베끼지 말고 새로 작성하세요.',
     '- 정답은 하나이며, 객관식 선택지는 정확히 5개이고 ①~⑤ 기호로 시작합니다.',
     '- 같은 지문 내용을 쓰되, 정답 근거는 지문 안에 있어야 합니다.',
+    '- body(본문)의 길이는 현재 문항과 비슷하게 유지하세요. 짧게 줄이지 마세요.',
     `- ${KOREAN_EXAM}`,
     '',
     '출력 형식:',
