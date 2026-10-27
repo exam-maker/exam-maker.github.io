@@ -1,5 +1,6 @@
 // js/analyze.js
 // 기출 분석 탭: 시험지 입력, AI 분석, 카드 표 수정, 요약, 설계도 저장·불러오기·복제·삭제를 담당합니다.
+// 원본 시험지 파일과 기출 원문(originalText)은 저장하지 않습니다.
 
 import { callAIJson, fileToBase64, AIError } from './ai.js';
 import { buildAnalysisPrompt } from './prompts.js';
@@ -69,6 +70,11 @@ function esc(text) {
   }[c]));
 }
 
+/** 기출 원문(originalText)을 빈 값으로 바꾼 카드를 돌려줍니다. 저장 전에 항상 거칩니다. */
+function stripOriginal(card) {
+  return { ...card, originalText: '' };
+}
+
 /** 버튼 동작 중 오류가 나면 화면에 알려 줍니다. */
 function safe(fn, ...args) {
   return Promise.resolve()
@@ -109,7 +115,7 @@ function renderShell() {
         <span>또는 텍스트 붙여넣기</span>
         <textarea id="an-text" rows="6" placeholder="시험지 내용을 그대로 붙여넣어도 됩니다."></textarea>
       </label>
-      <p class="an-hint">파일이 여러 개이거나 용량이 크면 한 번에 읽지 못할 수 있습니다. 그럴 때는 시험지를 나눠서 여러 번 분석하세요. 무료 등급 Gemini를 쓰면 입력 내용이 구글 학습에 쓰일 수 있습니다.</p>
+      <p class="an-hint">원본 시험지 파일은 저장되지 않습니다. 분석이 끝나면 입력 칸이 자동으로 비워집니다. 파일이 여러 개이거나 용량이 크면 한 번에 읽지 못할 수 있으니, 그럴 때는 시험지를 나눠서 분석하세요. 무료 등급 Gemini를 쓰면 입력 내용이 구글 학습에 쓰일 수 있습니다.</p>
       <button class="an-btn" data-action="analyze" id="an-run">유형 분석</button>
       <span id="an-status" class="an-status"></span>
     </section>
@@ -140,6 +146,14 @@ function readMeta() {
     exam: document.getElementById('an-exam').value,
     year: Number(document.getElementById('an-year').value),
   };
+}
+
+/** 파일 선택 칸, 파일 목록, 텍스트 칸을 비웁니다. 분석 성공 후에 씁니다. */
+function clearInputs() {
+  pendingFiles = [];
+  document.getElementById('an-files').value = '';
+  document.getElementById('an-file-list').textContent = '';
+  document.getElementById('an-text').value = '';
 }
 
 function mb(bytes) {
@@ -211,10 +225,11 @@ async function onAnalyze() {
       id: null,
       createdAt: null,
       meta,
-      cards: result.cards.map(normalizeCard),
+      cards: result.cards.map((c) => normalizeCard(stripOriginal(c))),
       trendNote: result.summary?.trendNote || '',
     };
-    status.textContent = `분석 완료: ${state.cards.length}개 문항`;
+    clearInputs();
+    status.textContent = `분석 완료: ${state.cards.length}개 문항 (원본 파일은 저장하지 않아 입력 칸을 비웠습니다)`;
     renderResult();
     document.getElementById('an-result').scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
@@ -225,7 +240,7 @@ async function onAnalyze() {
   }
 }
 
-/** 오류 메시지를 띄우고, AI 원문이 있으면 결과 영역에 보여 줍니다. */
+/** 오류 메시지를 띄우고, AI 원문이 있으면 결과 영역에 보여 줍니다. 화면에만 표시하며 저장하지 않습니다. */
 function showError(err) {
   alert(err.message || '알 수 없는 오류가 발생했습니다.');
   if (err.raw) {
@@ -249,14 +264,14 @@ function renderResult() {
   box.innerHTML = `
     <section class="an-card">
       <h3>3. 유형 카드 (직접 수정 가능)</h3>
-      <p class="an-hint">표의 값은 바로 고칠 수 있습니다. 붉은 행은 저장 전에 고쳐야 할 항목입니다.</p>
+      <p class="an-hint">표의 값은 바로 고칠 수 있습니다. 붉은 행은 저장 전에 고쳐야 할 항목입니다. 기출 원문은 저장하지 않으므로 표에 나타나지 않습니다.</p>
       <div class="an-scroll">
         <table class="an-table">
           <thead>
             <tr>
               <th>번호</th><th>형식</th><th>유형</th><th>발문 패턴</th><th>핵심 포인트</th>
               <th>난이도</th><th>배점</th><th>출처</th><th>선택지 수</th><th>메모</th>
-              <th>기출 원문</th><th>검사 / 삭제</th>
+              <th>검사 / 삭제</th>
             </tr>
           </thead>
           <tbody id="an-tbody"></tbody>
@@ -314,7 +329,6 @@ function rowHtml(card, i) {
       <td>${selectHtml('source', i, sourceOptions, card.source)}</td>
       <td><input type="number" min="0" data-field="choices" data-idx="${i}" value="${esc(card.choices ?? '')}"></td>
       <td><input data-field="note" data-idx="${i}" value="${esc(card.note)}"></td>
-      <td><textarea rows="2" data-field="originalText" data-idx="${i}">${esc(card.originalText)}</textarea></td>
       <td>
         ${errors.length ? `<span class="an-err">오류 ${errors.length}</span>` : '<span class="an-ok">정상</span>'}
         <br>
@@ -414,6 +428,9 @@ async function onSave() {
   const msg = document.getElementById('an-save-msg');
   state.trendNote = document.getElementById('an-trend').value.trim();
 
+  // 저장 직전에 기출 원문을 한 번 더 비웁니다.
+  const cards = state.cards.map(stripOriginal);
+
   const bp = {
     id: state.id || undefined,
     createdAt: state.createdAt || new Date().toISOString(),
@@ -421,8 +438,8 @@ async function onSave() {
     grade: meta.grade,
     exam: meta.exam,
     year: meta.year,
-    cards: state.cards,
-    summary: { ...buildSummary(state.cards), trendNote: state.trendNote },
+    cards,
+    summary: { ...buildSummary(cards), trendNote: state.trendNote },
   };
 
   const errors = validateBlueprint(bp);
@@ -435,6 +452,7 @@ async function onSave() {
   await putItem('blueprints', bp); // 새 설계도면 id가 자동으로 만들어집니다.
   state.id = bp.id;
   state.createdAt = bp.createdAt;
+  state.cards = cards;
 
   // 연결된 저장 폴더에도 JSON 파일을 만듭니다. 실패해도 위의 브라우저 저장은 유지됩니다.
   let folderMsg = '';
@@ -445,7 +463,6 @@ async function onSave() {
     console.warn('파일 저장 실패:', err);
     folderMsg = ' (파일 저장에 실패했습니다. 콘솔의 안내를 확인하세요.)';
   }
-
 
   msg.textContent = `저장되었습니다.${folderMsg}`;
   await renderList();
@@ -496,7 +513,7 @@ async function onLoad(id) {
     id: bp.id,
     createdAt: bp.createdAt,
     meta: { school: bp.school, grade: bp.grade, exam: bp.exam, year: bp.year },
-    cards: (bp.cards || []).map(normalizeCard),
+    cards: (bp.cards || []).map((c) => normalizeCard(stripOriginal(c))),
     trendNote: bp.summary?.trendNote || '',
   };
   setMetaInputs(state.meta);
@@ -514,7 +531,7 @@ async function onDuplicate(id) {
     id: crypto.randomUUID(),
     school: `${bp.school} (복제)`,
     createdAt: new Date().toISOString(),
-    cards: JSON.parse(JSON.stringify(bp.cards || [])),
+    cards: (bp.cards || []).map((c) => stripOriginal(JSON.parse(JSON.stringify(c)))),
   };
   await putItem('blueprints', copy);
   await renderList();
@@ -525,6 +542,22 @@ async function onDelete(id) {
   await deleteItem('blueprints', id);
   if (state.id === id) state.id = null;
   await renderList();
+}
+
+/**
+ * 이전 버전에서 저장된 설계도에 남아 있는 기출 원문을 지웁니다.
+ * 탭을 열 때 한 번 실행됩니다. 이미 깨끗한 설계도는 건드리지 않습니다.
+ */
+async function removeLegacyOriginals() {
+  const items = await getAll('blueprints');
+  for (const bp of items) {
+    const hasOriginal = (bp.cards || []).some((c) => c.originalText);
+    if (!hasOriginal) continue;
+    await putItem('blueprints', {
+      ...bp,
+      cards: bp.cards.map((c) => stripOriginal(c)),
+    });
+  }
 }
 
 /** 탭 안의 버튼 클릭을 한 곳에서 처리합니다. */
@@ -574,6 +607,12 @@ export async function initAnalyze() {
   panel.addEventListener('click', onClick);
   panel.addEventListener('change', onChange);
   panel.addEventListener('input', onInput);
+
+  try {
+    await removeLegacyOriginals();
+  } catch (err) {
+    console.warn('기존 설계도의 원문 정리에 실패했습니다:', err);
+  }
 
   // 파일 선택 상자는 화면을 다시 그리면 초기화되므로, 목록 표시는 이벤트에서만 바꿉니다.
   await renderList();
